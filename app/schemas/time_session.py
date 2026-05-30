@@ -6,7 +6,7 @@ class TimeSession(BaseModel):
     activity_id: int
     started_at: datetime
     ended_at: datetime | None
-    duration_second: int | None
+    duration_seconds: int | None
     comment: str | None
 
 class TimeSessionStart(BaseModel):
