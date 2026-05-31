@@ -16,6 +16,38 @@ def get_active_session() -> TimeSession | None:
     return None
 
 
+def get_sessions(activity_id: int | None = None, is_active: bool | None = None) -> list[TimeSession]:
+    result = list(sessions.values())
+
+    if activity_id is not None:
+        activity = get_activity(activity_id)
+
+        if activity is None:
+            raise ActivityNotFoundError()
+        result = [
+            session 
+            for session in result
+            if session.activity_id == activity_id
+            ]
+    
+    if is_active is not None:
+        result = [
+            session
+            for session in result
+            if (session.ended_at is None) == is_active
+        ]
+
+    return result
+         
+
+def get_session(session_id: int) -> TimeSession:
+    session = sessions.get(session_id)
+    if session is None:
+        raise SessionNotFoundError()
+    
+    return session
+
+
 def start_session(data: TimeSessionStart) -> TimeSession:
     global next_session_id
 
@@ -55,38 +87,6 @@ def stop_session(session_id: int) -> TimeSession:
 
     session.ended_at = ended_at
     session.duration_seconds = duration_seconds
-    
-    return session
-
-
-def get_sessions(activity_id: int | None = None, is_active: bool | None = None) -> list[TimeSession]:
-    result = list(sessions.values())
-
-    if activity_id is not None:
-        activity = get_activity(activity_id)
-
-        if activity is None:
-            raise ActivityNotFoundError()
-        result = [
-            session 
-            for session in result
-            if session.activity_id == activity_id
-            ]
-    
-    if is_active is not None:
-        result = [
-            session
-            for session in result
-            if (session.ended_at is None) == is_active
-        ]
-
-    return result
-         
-
-def get_session(session_id: int) -> TimeSession:
-    session = sessions.get(session_id)
-    if session is None:
-        raise SessionNotFoundError()
     
     return session
 

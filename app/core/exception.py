@@ -16,3 +16,7 @@ class SessionAlreadyStoppedError(Exception):
 
 class SessionNotCompletedError(Exception):
     pass
+
+
+class DataConsistencyError(Exception):
+    pass
