@@ -1,17 +1,20 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
-from app.core.exception import DataConsistencyError
+from app.db.database import get_db
 from app.schemas.stats import ActivityStatsRead
 from app.services.stats_service import get_stats_by_activity
 
+
+
 router = APIRouter(
     prefix="/stats",
-    tags=["Stats"]
+    tags=["Stats"],
 )
 
+
 @router.get("/by-activity", response_model=list[ActivityStatsRead])
-def get_stats_by_activity_endpoint() -> list[ActivityStatsRead]:
-    try:
-        return get_stats_by_activity()
-    except DataConsistencyError():
-        raise HTTPException(status_code=500, detail="Internal data consistency erro")
+def get_stats_by_activity_endpoint(
+    db: Session = Depends(get_db),
+) -> list[ActivityStatsRead]:
+    return get_stats_by_activity(db)

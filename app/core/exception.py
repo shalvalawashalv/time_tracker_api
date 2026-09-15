@@ -2,6 +2,10 @@ class ActivityNotFoundError(Exception):
     pass
 
 
+class ActivityAlreadyExistError(Exception):
+    pass
+
+
 class ActiveSessionAlreadyExistsError(Exception):
     pass
 

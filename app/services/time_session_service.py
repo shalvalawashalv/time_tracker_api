@@ -1,80 +1,78 @@
 from datetime import datetime, timezone
+from uuid import UUID
 
-from app.core.exception import ActivityNotFoundError, ActiveSessionAlreadyExistsError, SessionNotFoundError, SessionAlreadyStoppedError, SessionNotCompletedError
-from app.schemas.time_session import TimeSession, TimeSessionStart
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.core.exception import (
+    ActivityNotFoundError,
+    ActiveSessionAlreadyExistsError,
+    SessionNotFoundError,
+    SessionAlreadyStoppedError,
+    SessionNotCompletedError,
+)
+from app.db.models import TimeSession
+from app.schemas.time_session import TimeSessionStart
 from app.services.activity_service import get_activity
 
-sessions: dict[int, TimeSession] = {}
-next_session_id: int = 1
 
 
-def get_active_session() -> TimeSession | None:
-    for session in sessions.values():
-        if session.ended_at is None:
-            return session
-    
-    return None
-
-
-def get_sessions(activity_id: int | None = None, is_active: bool | None = None) -> list[TimeSession]:
-    result = list(sessions.values())
+def get_sessions(
+    db: Session,
+    activity_id: UUID | None = None,
+    is_active: bool | None = None,
+) -> list[TimeSession]:
+    stmt = select(TimeSession)
 
     if activity_id is not None:
-        activity = get_activity(activity_id)
-
-        if activity is None:
+        if get_activity(db, activity_id) is None:
             raise ActivityNotFoundError()
-        result = [
-            session 
-            for session in result
-            if session.activity_id == activity_id
-            ]
-    
-    if is_active is not None:
-        result = [
-            session
-            for session in result
-            if (session.ended_at is None) == is_active
-        ]
 
-    return result
-         
+        stmt = stmt.where(TimeSession.activity_id == activity_id)
 
-def get_session(session_id: int) -> TimeSession:
-    session = sessions.get(session_id)
+    if is_active is True:
+        stmt = stmt.where(TimeSession.ended_at.is_(None))
+    elif is_active is False:
+        stmt = stmt.where(TimeSession.ended_at.is_not(None))
+
+    return list(db.scalars(stmt).all())
+
+
+def get_session(
+    db: Session,
+    session_id: UUID,
+) -> TimeSession:
+    session = db.get(TimeSession, session_id)
+
     if session is None:
         raise SessionNotFoundError()
     
     return session
 
 
-def start_session(data: TimeSessionStart) -> TimeSession:
-    global next_session_id
-
-    if get_activity(data.activity_id) is None:
+def start_session(
+    db: Session,
+    data: TimeSessionStart,
+) -> TimeSession:
+    if get_activity(db, data.activity_id) is None:
         raise ActivityNotFoundError()
     
-    if get_active_session() is not None:
+    if get_sessions(db, is_active=True):
         raise ActiveSessionAlreadyExistsError()
-    
-    started_at = datetime.now(timezone.utc)
 
-    session = TimeSession(
-        id=next_session_id,
-        activity_id=data.activity_id,
-        started_at=started_at,
-        ended_at=None,
-        duration_seconds=None,
-        comment=None
-    )
+    session = TimeSession(activity_id=data.activity_id)
 
-    sessions[next_session_id] = session
-    next_session_id += 1
+    db.add(session)
+    db.commit()
 
     return session
 
-def stop_session(session_id: int) -> TimeSession:
-    session = sessions.get(session_id)
+
+def stop_session(
+    db: Session,
+    session_id: UUID,
+) -> TimeSession:
+    session = db.get(TimeSession, session_id)
 
     if session is None:
         raise SessionNotFoundError()
@@ -87,12 +85,18 @@ def stop_session(session_id: int) -> TimeSession:
 
     session.ended_at = ended_at
     session.duration_seconds = duration_seconds
+
+    db.commit()
     
     return session
 
 
-def patch_comment(session_id: int, comment: str) -> TimeSession:
-    session = sessions.get(session_id)
+def patch_comment(
+    db: Session,
+    session_id: UUID,
+    comment: str,
+) -> TimeSession:
+    session = db.get(TimeSession, session_id)
 
     if session is None:
         raise SessionNotFoundError()
@@ -101,5 +105,6 @@ def patch_comment(session_id: int, comment: str) -> TimeSession:
         raise SessionNotCompletedError()
     
     session.comment = comment
+    db.commit()
     
     return session

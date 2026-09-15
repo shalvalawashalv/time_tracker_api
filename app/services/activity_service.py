@@ -1,23 +1,49 @@
-from app.schemas.activity import ActivityCreate, ActivityRead, Activity
+from uuid import UUID
 
-activities: dict[int, Activity] = {}
-next_activity_id: int = 1
+from psycopg.errors import UniqueViolation
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
-def create_activity(data: ActivityCreate) -> Activity:
-    global next_activity_id
+from app.core.exception import ActivityAlreadyExistError
+from app.db.models import Activity
+from app.schemas.activity import ActivityCreate
 
-    activity = Activity(
-        id=next_activity_id,
-        name=data.name,
-    )
 
-    activities[activity.id] = activity
-    next_activity_id += 1
+
+def create_activity(
+    db: Session,
+    data: ActivityCreate,
+) -> Activity:
+    activity = Activity(name=data.name)
+    db.add(activity)
+
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        if (
+            isinstance(exc.orig, UniqueViolation)
+            and exc.orig.diag.constraint_name == "uq_activities_name"
+        ):
+            raise ActivityAlreadyExistError() from exc
+
+        raise
 
     return activity
 
-def get_activities() -> list[ActivityRead]:
-    return list(activities.values())
 
-def get_activity(activity_id: int) -> ActivityRead | None:
-    return activities.get(activity_id)
+def get_activities(
+    db: Session,
+) -> list[Activity]:
+    stmt = select(Activity)
+    activities = db.scalars(stmt).all()
+
+    return list(activities)
+
+
+def get_activity(
+    db: Session,
+    activity_id: UUID,
+) -> Activity | None:
+    return db.get(Activity, activity_id)

@@ -1,16 +1,23 @@
-from pydantic import BaseModel
+from uuid import UUID
 from datetime import datetime
 
-class TimeSession(BaseModel):
-    id: int
-    activity_id: int
+from pydantic import BaseModel, ConfigDict
+
+
+
+class TimeSessionRead(BaseModel):
+    id: UUID
+    activity_id: UUID
     started_at: datetime
     ended_at: datetime | None
     duration_seconds: int | None
     comment: str | None
+    model_config = ConfigDict(from_attributes=True)
+
 
 class TimeSessionStart(BaseModel):
-    activity_id: int
+    activity_id: UUID
+
 
 class TimeSessionComment(BaseModel):
     comment: str
