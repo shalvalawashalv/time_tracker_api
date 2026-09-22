@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exception import (
     ActivityNotFoundError,
@@ -32,74 +32,98 @@ router = APIRouter(
 )
 
 
-@router.post("/start", response_model=TimeSessionRead, status_code=status.HTTP_201_CREATED)
-def start_session_endpoint(
-    data: TimeSessionStart,
-    db: Session = Depends(get_db),
-):
-    try:
-        session = start_session(db, data)
-    except ActivityNotFoundError:
-        raise HTTPException(status_code=404, detail="Activity not found")
-    except ActiveSessionAlreadyExistsError:
-        raise HTTPException(status_code=409, detail="Active session already exists")
-    
-    return session
-
-
-@router.post("/{session_id}/stop", response_model=TimeSessionRead)
-def stop_session_endpoint(
-    session_id: UUID,
-    db: Session = Depends(get_db),
-):
-    try:
-        session = stop_session(db, session_id)
-    except SessionNotFoundError:
-        raise HTTPException(status_code=404, detail="Session not found")
-    except SessionAlreadyStoppedError:
-        raise HTTPException(status_code=409, detail="Session is already stopped")
-    
-    return session
-
-
 @router.get("/", response_model=list[TimeSessionRead])
-def get_sessions_endpoint(
+async def get_sessions_endpoint(
     activity_id: UUID | None = None,
     is_active: bool | None = None,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     try:
-        result = get_sessions(db, activity_id, is_active)
+        result = await get_sessions(db, activity_id, is_active)
     except ActivityNotFoundError:
-        raise HTTPException(status_code=404, detail="Activity not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Activity not found",
+        )
 
     return result
 
 
 @router.get("/{session_id}", response_model=TimeSessionRead)
-def get_session_endpoint(
+async def get_session_endpoint(
     session_id: UUID,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     try:
-        session = get_session(db, session_id)
+        session = await get_session(db, session_id)
     except SessionNotFoundError:
-        raise HTTPException(status_code=404, detail="Session not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found",
+        )
 
     return session
 
 
-@router.patch("/{session_id}/comment", response_model=TimeSessionRead)
-def patch_comment_endpoint(
-    session_id: UUID,
-    comment: TimeSessionComment,
-    db: Session = Depends(get_db),
+@router.post("/start", response_model=TimeSessionRead, status_code=status.HTTP_201_CREATED)
+async def start_session_endpoint(
+    data: TimeSessionStart,
+    db: AsyncSession = Depends(get_db),
 ):
     try:
-        session = patch_comment(db, session_id, comment.comment)
+        session = await start_session(db, data)
+    except ActivityNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Activity not found",
+        )
+    except ActiveSessionAlreadyExistsError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Active session already exists",
+        )
+    
+    return session
+
+
+@router.post("/{session_id}/stop", response_model=TimeSessionRead)
+async def stop_session_endpoint(
+    session_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        session = await stop_session(db, session_id)
     except SessionNotFoundError:
-        raise HTTPException(status_code=404, detail="Session not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found",
+        )
+    except SessionAlreadyStoppedError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Session is already stopped",
+        )
+    
+    return session
+
+
+@router.patch("/{session_id}/comment", response_model=TimeSessionRead)
+async def patch_comment_endpoint(
+    session_id: UUID,
+    comment: TimeSessionComment,
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        session = await patch_comment(db, session_id, comment.comment)
+    except SessionNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found",
+        )
     except SessionNotCompletedError:
-        raise HTTPException(status_code=409, detail="Cannot update comment before session is stopped")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot update comment before session is stopped",
+        )
     
     return session

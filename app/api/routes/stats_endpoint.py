@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import get_db
 from app.schemas.stats import ActivityStatsRead
@@ -14,7 +14,7 @@ router = APIRouter(
 
 
 @router.get("/by-activity", response_model=list[ActivityStatsRead])
-def get_stats_by_activity_endpoint(
-    db: Session = Depends(get_db),
+async def get_stats_by_activity_endpoint(
+    db: AsyncSession = Depends(get_db),
 ) -> list[ActivityStatsRead]:
-    return get_stats_by_activity(db)
+    return await get_stats_by_activity(db)

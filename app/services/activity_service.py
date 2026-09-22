@@ -2,7 +2,7 @@ from uuid import UUID
 
 from psycopg.errors import UniqueViolation
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
 from app.core.exception import ActivityAlreadyExistError
@@ -11,17 +11,34 @@ from app.schemas.activity import ActivityCreate
 
 
 
-def create_activity(
-    db: Session,
+async def get_activities(
+    db: AsyncSession,
+) -> list[Activity]:
+    stmt = select(Activity)
+    result = await db.scalars(stmt)
+    activities = result.all()
+
+    return list(activities)
+
+
+async def get_activity(
+    db: AsyncSession,
+    activity_id: UUID,
+) -> Activity | None:
+    return await db.get(Activity, activity_id)
+
+
+async def create_activity(
+    db: AsyncSession,
     data: ActivityCreate,
 ) -> Activity:
     activity = Activity(name=data.name)
     db.add(activity)
 
     try:
-        db.commit()
+        await db.commit()
     except IntegrityError as exc:
-        db.rollback()
+        await db.rollback()
         if (
             isinstance(exc.orig, UniqueViolation)
             and exc.orig.diag.constraint_name == "uq_activities_name"
@@ -31,19 +48,4 @@ def create_activity(
         raise
 
     return activity
-
-
-def get_activities(
-    db: Session,
-) -> list[Activity]:
-    stmt = select(Activity)
-    activities = db.scalars(stmt).all()
-
-    return list(activities)
-
-
-def get_activity(
-    db: Session,
-    activity_id: UUID,
-) -> Activity | None:
-    return db.get(Activity, activity_id)
+    

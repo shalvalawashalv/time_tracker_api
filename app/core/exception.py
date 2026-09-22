@@ -24,3 +24,6 @@ class SessionNotCompletedError(Exception):
 
 class DataConsistencyError(Exception):
     pass
+
+class UserAlreadyExistsError(Exception):
+    pass

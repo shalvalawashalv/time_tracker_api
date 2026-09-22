@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from app.db.models import Activity, TimeSession
@@ -6,8 +6,8 @@ from app.schemas.stats import ActivityStatsRead
 
 
 
-def get_stats_by_activity(
-    db: Session,
+async def get_stats_by_activity(
+    db: AsyncSession,
 ) -> list[ActivityStatsRead]:
     stmt = (
         select(
@@ -21,7 +21,7 @@ def get_stats_by_activity(
         .group_by(Activity.id)
     )
 
-    rows = db.execute(stmt).all()
+    rows = (await db.execute(stmt)).all()
 
     return [
         ActivityStatsRead(

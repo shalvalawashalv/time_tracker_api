@@ -1,36 +1,34 @@
-from collections.abc import Generator
+from collections.abc import AsyncGenerator
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.orm import DeclarativeBase
 
 from app.core.config import settings
+
 
 
 class Base(DeclarativeBase):
     pass
 
 
-engine = create_engine(
+engine = create_async_engine(
     settings.database_url,
     echo=settings.db_echo,
     pool_pre_ping=True,
 )
 
-SessionLocal = sessionmaker(
+SessionLocal = async_sessionmaker(
     bind=engine,
-    class_=Session,
+    class_=AsyncSession,
     autoflush=False,
     expire_on_commit=False,
 )
 
 
-def get_db() -> Generator[Session, None, None]:
-    db = SessionLocal()
-
-    try:
-        yield db
-    except Exception:
-        db.rollback()
-        raise
-    finally:
-        db.close()
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    async with SessionLocal() as db:
+        try:
+            yield db
+        except Exception:
+            await db.rollback()
+            raise

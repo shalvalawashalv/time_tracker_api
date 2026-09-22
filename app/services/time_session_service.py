@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exception import (
     ActivityNotFoundError,
@@ -17,15 +17,15 @@ from app.services.activity_service import get_activity
 
 
 
-def get_sessions(
-    db: Session,
+async def get_sessions(
+    db: AsyncSession,
     activity_id: UUID | None = None,
     is_active: bool | None = None,
 ) -> list[TimeSession]:
     stmt = select(TimeSession)
 
     if activity_id is not None:
-        if get_activity(db, activity_id) is None:
+        if await get_activity(db, activity_id) is None:
             raise ActivityNotFoundError()
 
         stmt = stmt.where(TimeSession.activity_id == activity_id)
@@ -35,14 +35,15 @@ def get_sessions(
     elif is_active is False:
         stmt = stmt.where(TimeSession.ended_at.is_not(None))
 
-    return list(db.scalars(stmt).all())
+    result = await db.scalars(stmt)
+    return list(result.all())
 
 
-def get_session(
-    db: Session,
+async def get_session(
+    db: AsyncSession,
     session_id: UUID,
 ) -> TimeSession:
-    session = db.get(TimeSession, session_id)
+    session = await db.get(TimeSession, session_id)
 
     if session is None:
         raise SessionNotFoundError()
@@ -50,29 +51,29 @@ def get_session(
     return session
 
 
-def start_session(
-    db: Session,
+async def start_session(
+    db: AsyncSession,
     data: TimeSessionStart,
 ) -> TimeSession:
-    if get_activity(db, data.activity_id) is None:
+    if await get_activity(db, data.activity_id) is None:
         raise ActivityNotFoundError()
     
-    if get_sessions(db, is_active=True):
+    if await get_sessions(db, is_active=True):
         raise ActiveSessionAlreadyExistsError()
 
     session = TimeSession(activity_id=data.activity_id)
 
     db.add(session)
-    db.commit()
+    await db.commit()
 
     return session
 
 
-def stop_session(
-    db: Session,
+async def stop_session(
+    db: AsyncSession,
     session_id: UUID,
 ) -> TimeSession:
-    session = db.get(TimeSession, session_id)
+    session = await db.get(TimeSession, session_id)
 
     if session is None:
         raise SessionNotFoundError()
@@ -86,17 +87,17 @@ def stop_session(
     session.ended_at = ended_at
     session.duration_seconds = duration_seconds
 
-    db.commit()
+    await db.commit()
     
     return session
 
 
-def patch_comment(
-    db: Session,
+async def patch_comment(
+    db: AsyncSession,
     session_id: UUID,
     comment: str,
 ) -> TimeSession:
-    session = db.get(TimeSession, session_id)
+    session = await db.get(TimeSession, session_id)
 
     if session is None:
         raise SessionNotFoundError()
@@ -105,6 +106,6 @@ def patch_comment(
         raise SessionNotCompletedError()
     
     session.comment = comment
-    db.commit()
+    await db.commit()
     
     return session

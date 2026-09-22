@@ -7,10 +7,11 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     String,
+    Text,
     Uuid,
     func,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.db.database import Base
 
@@ -81,5 +82,33 @@ class TimeSession(Base):
             (ended_at IS NOT NULL AND duration_seconds IS NOT NULL)
             """,
             name="ck_sessions_completion_consistent",
+        ),
+    )
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[UUID] = mapped_column(
+        Uuid,
+        primary_key=True,
+        default=uuid4,
+    )
+    username: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+    )
+    password_hash: Mapped[str] = mapped_column(
+        Text,
+        nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    __table_args__ = (
+        UniqueConstraint(
+            "username",
+            name="uq_users_username",
         ),
     )

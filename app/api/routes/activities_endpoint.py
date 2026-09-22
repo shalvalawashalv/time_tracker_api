@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exception import ActivityAlreadyExistError
 from app.db.database import get_db
@@ -21,31 +21,37 @@ router = APIRouter(
 
 
 @router.get("/", response_model=list[ActivityRead])
-def get_activities_endpoint(
-    db: Session = Depends(get_db),
+async def get_activities_endpoint(
+    db: AsyncSession = Depends(get_db),
 ):
-    return get_activities(db)
+    return await get_activities(db)
 
 
 @router.get("/{activity_id}", response_model=ActivityRead)
-def get_activity_endpoint(
+async def get_activity_endpoint(
     activity_id: UUID,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
-    activity = get_activity(db, activity_id)
+    activity = await get_activity(db, activity_id)
 
     if activity is None:
-        raise HTTPException(status_code=404, detail="Activity not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Activity not found",
+        )
     
     return activity
 
 
 @router.post("/", response_model=ActivityRead, status_code=status.HTTP_201_CREATED)
-def create_activity_endpoint(
+async def create_activity_endpoint(
     data: ActivityCreate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     try:
-        return create_activity(db, data)
+        return await create_activity(db, data)
     except ActivityAlreadyExistError:
-        raise HTTPException(status_code=409, detail="Activity already exists")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Activity already exists",
+        )
